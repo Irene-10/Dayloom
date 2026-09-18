@@ -11,19 +11,23 @@ const PROJECTS={
   health:{key:'health',name:'运动健康',en:'Health',icon:'activity',color:'#3e806b',short:'健康'},
   hobby:{key:'hobby',name:'兴趣爱好',en:'Hobbies',icon:'star',color:'#bb7a48',short:'兴趣'},
   life:{key:'life',name:'日常生活',en:'Life',icon:'home',color:'#4e8290',short:'生活'},
-  plans:{key:'plans',name:'个人计划',en:'Personal Plans',icon:'target',color:'#a65e83',short:'计划'}
+  plans:{key:'plans',name:'副业探索',en:'Side Projects',icon:'target',color:'#a65e83',short:'副业'}
 };
 const PROJ_ORDER=['work','learning','health','hobby','life','plans'];
 const PRIORITY={high:{label:'高',color:'#ad5558'},medium:{label:'中',color:'#8a704b'},low:{label:'低',color:'#77837f'}};
 const TASK_STATUS_LABEL={backlog:'待办',todo:'待办',inprogress:'进行中',review:'待检查',done:'已完成'};
 const BOARD_COLS=[{key:'backlog',label:'待办',color:'#75817d'},{key:'inprogress',label:'进行中',color:'#244b5a'},{key:'review',label:'待检查',color:'#52676f'},{key:'done',label:'已完成',color:'#56756b'}];
 const CHECKIN_DEFS=[
-  {k:'sleep',icon:'moon',l:'早睡'},
-  {k:'exercise',icon:'activity',l:'运动'},
-  {k:'reading',icon:'book',l:'阅读'},
-  {k:'water',icon:'globe',l:'喝水'},
-  {k:'focus',icon:'target',l:'专注'}
+  {k:'sleep',icon:'moon',l:'早睡',emoji:'🌙'},
+  {k:'exercise',icon:'activity',l:'运动',emoji:'🏃'},
+  {k:'reading',icon:'book',l:'阅读',emoji:'📖'},
+  {k:'study',icon:'book',l:'学习',emoji:'✍️',color:'#7960a8'},
+  {k:'journal',icon:'note',l:'记录',emoji:'📝',color:'#bb7a48'}
 ];
+const HABIT_COLORS=['#3e806b','#376b91','#a65e83','#7960a8','#bb7a48','#4e8290'];
+CHECKIN_DEFS[0].color='#3e806b'; CHECKIN_DEFS[1].color='#376b91'; CHECKIN_DEFS[2].color='#a65e83';
+const PROJECT_DEFAULTS=PROJ_ORDER.map(k=>({...PROJECTS[k]}));
+const HABIT_DEFAULTS=CHECKIN_DEFS.map(c=>({...c,createdAt:null,archivedAt:null}));
 const MOODS=['😫','😕','😐','🙂','🤩'];
 const ICONS={
   home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
@@ -75,5 +79,5 @@ function ic(name,size,cls){ const s=size||18; return '<svg class="'+(cls||'')+'"
 const NAV=[{type:'item',view:'home',label:'首页',icon:'home'},{type:'item',view:'today',label:'今日',icon:'fire'},{type:'item',view:'calendar',label:'日历',icon:'calendar'},{type:'item',view:'projects',label:'项目',icon:'target'},{type:'item',view:'knowledge',label:'知识库',icon:'bulb'},{type:'item',view:'statistics',label:'数据',icon:'trend'},{type:'item',view:'settings',label:'设置',icon:'settings'}];
 
 function seed(){
-  return {version:4,productId:'everyday-worktable',settings:{name:'你',theme:'light',palette:'calm'},tasks:[],knowledge:[],knowledgeTags:[],knowledgeReviewLog:{},checkins:{},moods:{},notes:{},dailyLogs:[]};
+  return {version:4,productId:'everyday-worktable',settings:{name:'你',theme:'light',palette:'calm'},tasks:[],knowledge:[],knowledgeTags:[],knowledgeReviewLog:{},checkins:{},moods:{},notes:{},dailyLogs:[],projects:PROJECT_DEFAULTS.map(p=>({...p})),habits:HABIT_DEFAULTS.map(c=>({...c}))};
 }

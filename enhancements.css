@@ -326,3 +326,38 @@
 .sync-form{display:flex;flex-wrap:wrap;gap:9px;align-items:center}.sync-form input{min-width:185px;flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink)}
 .sync-form input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .sync-conflict{padding:12px;margin:10px 0;border:1px solid var(--line);border-radius:10px;background:var(--panel)}.sync-conflict p{margin:0 0 10px;color:var(--ink-2);font-size:13px}.sync-conflict .btn{margin-right:8px;margin-bottom:5px}
+
+/* 打卡记录成为数据区的主图：圆点颜色对应习惯，深色日期表示当日全部完成。 */
+.stats-checkin-panel{grid-template-columns:minmax(0,1.8fr) minmax(180px,.55fr);background:var(--card)}
+.stats-checkin-panel .checkin-trend{min-width:0}
+.stats-checkin-panel .month-checkin{margin:0;padding:0;background:transparent;border:0;border-radius:0}
+.month-checkin-head>div:first-child{display:grid;gap:4px}
+.month-checkin-head>div.month-nav{display:flex;align-items:center;gap:4px;flex:none}
+.month-nav .icon-btn{width:32px;height:32px;border:1px solid var(--line);border-radius:8px}
+.month-day{min-height:67px;gap:3px;background:var(--panel)}
+.month-day.full{background:#244b5a;border-color:#244b5a;color:#fff}
+.month-day.full .month-date{color:#fff}
+.month-day.full.today{box-shadow:inset 0 0 0 2px #f5d992}
+.month-mood{min-height:22px;font-size:17px;line-height:22px;align-self:center;text-align:center;filter:drop-shadow(0 1px 1px color-mix(in srgb,var(--mood-color) 35%,transparent))}
+.month-dots{justify-content:center;gap:4px;flex-wrap:nowrap}
+.month-dots i{width:7px;height:7px;flex:none;border-color:color-mix(in srgb,var(--habit-color) 40%,var(--line));opacity:.55}
+.month-dots i.on{background:var(--habit-color);border-color:var(--habit-color);opacity:1}
+.month-dots i.inactive{opacity:.15}
+.month-day.full .month-dots i.on{box-shadow:0 0 0 1px rgba(255,255,255,.72)}
+.month-checkin-foot{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap}
+.month-legend{margin:0;justify-content:flex-end}.month-legend i,.manage-swatch{width:9px;height:9px;border-radius:50%;background:var(--habit-color);display:inline-block;flex:none}
+.ck-tally-row{color:var(--habit-color)}.ck-tally-row .ck-tally-l{color:var(--ink-2)}
+.state-label-actions{display:flex;align-items:center;justify-content:space-between}
+.text-action{border:0;background:none;color:var(--accent);font-size:12px;cursor:pointer}
+.today-ci .ci-btn.on{background:color-mix(in srgb,var(--habit-color) 12%,var(--card));border-color:color-mix(in srgb,var(--habit-color) 42%,var(--line));color:var(--habit-color)}
+.today-ci .habit-emoji{font-size:18px;line-height:1.2;width:24px;justify-content:center}
+.mood-row .mood{display:flex;flex-direction:column;align-items:center;gap:2px;line-height:1.2}
+.mood-emoji{font-size:19px;line-height:1.3}.mood-row .mood.on{background:color-mix(in srgb,var(--mood-color) 13%,var(--card));border-color:var(--mood-color);color:var(--mood-color)}
+.manage-lead,.manage-list-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.manage-lead{margin:0 0 14px}.manage-lead p{margin:0}
+.project-edit{width:30px;height:30px;flex:none;opacity:.75}.project-edit:hover{opacity:1}
+.manage-list-head{margin:18px 0 8px}.manage-list-head:first-of-type{margin-top:12px}.manage-list{display:grid;gap:5px}
+.manage-row{display:flex;align-items:center;gap:10px;padding:7px 9px;background:var(--panel);border:1px solid var(--line);border-radius:9px}
+.manage-row .manage-swatch{background:var(--item-color)}.manage-row>span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.manage-row .btn{flex:none}
+@media(max-width:900px){.stats-checkin-panel{grid-template-columns:1fr}.stats-checkin-panel .checkin-trend{padding:0 0 18px;border-right:0;border-bottom:1px solid var(--line)}}
+@media(max-width:600px){.month-day{min-height:53px;padding:5px 3px}.month-mood{font-size:15px;min-height:18px;line-height:18px}.month-dots{gap:2px;flex-wrap:wrap}.month-dots i{width:4px;height:4px}.month-checkin-head{flex-direction:row;align-items:flex-start}.month-checkin-foot{display:grid}.month-legend{justify-content:flex-start}.manage-lead{align-items:flex-start}.manage-row{gap:6px}.manage-row .btn{padding-inline:6px}}

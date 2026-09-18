@@ -4,10 +4,28 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const net=require('node:net');
+const vm=require('node:vm');
 const {spawn}=require('node:child_process');
 
 function freePort(){return new Promise(resolve=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});}
 function emptyState(){return {version:4,productId:'everyday-worktable',settings:{name:'测试'},tasks:[],knowledge:[],checkins:{},moods:{},notes:{}};}
+test('公开版默认项目与打卡、空白数据',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','data.js'),'utf8');
+  const state=vm.runInNewContext(source+'\n({projects:PROJECT_DEFAULTS.map(p=>p.name),habits:HABIT_DEFAULTS.map(c=>c.l),seed:seed()})');
+  assert.deepEqual([...state.projects],['工作事业','长期学习','运动健康','兴趣爱好','日常生活','副业探索']);
+  assert.deepEqual([...state.habits],['早睡','运动','阅读','学习','记录']);
+  assert.equal(state.seed.tasks.length,0);assert.equal(state.seed.knowledge.length,0);
+});
+test('旧版喝水记录保留原义，新打卡使用独立键',()=>{
+  const data=fs.readFileSync(path.join(__dirname,'..','data.js'),'utf8');
+  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+  const migrate=app.match(/function hydrateDefinitions\(\)\{[\s\S]*?^\}/m)?.[0];
+  assert.ok(migrate);
+  const result=vm.runInNewContext(data+'\n'+migrate+'\nlet S={checkins:{"2026-09-18":{water:true}}};let projFilter="all";function todayISO(){return "2026-09-19";}hydrateDefinitions();({active:CHECKIN_DEFS.map(c=>c.k),old:S.habits.find(c=>c.k==="water")})');
+  assert.ok([...result.active].includes('study'));
+  assert.equal(result.old.l,'喝水');
+  assert.equal(result.old.archivedAt,'2026-09-20');
+});
 test('账号隔离、SQLite 持久化 API、版本冲突',async()=>{
   const port=await freePort();
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'everyday-worktable-test-'));
@@ -35,9 +53,17 @@ test('账号隔离、SQLite 持久化 API、版本冲突',async()=>{
     assert.notEqual(a.cookie,b.cookie);
     assert.equal((await request('/api/state','GET',null,a.cookie)).data.state,null);
     const state=emptyState();state.knowledge.push({id:'note-1',text:'只属于 Alice 的测试笔记',tags:[]});
+    state.projects=[{key:'work',name:'自定义工作',color:'#376b91'}];
+    state.habits=[{k:'reading',l:'阅读',color:'#a65e83',emoji:'📖',createdAt:null,archivedAt:null}];
+    state.checkins['2026-09-18']={reading:true};state.moods['2026-09-18']='🙂';
     const saved=await request('/api/state','PUT',{revision:0,state},a.cookie);
     assert.equal(saved.status,200);assert.equal(saved.data.revision,1);
     assert.equal((await request('/api/state','GET',null,a.cookie)).data.state.knowledge[0].text,state.knowledge[0].text);
+    const restored=(await request('/api/state','GET',null,a.cookie)).data.state;
+    assert.equal(restored.projects[0].name,'自定义工作');
+    assert.equal(restored.habits[0].l,'阅读');
+    assert.equal(restored.checkins['2026-09-18'].reading,true);
+    assert.equal(restored.moods['2026-09-18'],'🙂');
     assert.equal((await request('/api/state','GET',null,b.cookie)).data.state,null);
     const conflict=await request('/api/state','PUT',{revision:0,state},a.cookie);
     assert.equal(conflict.status,409);assert.equal(conflict.data.revision,1);

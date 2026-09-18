@@ -1,0 +1,8 @@
+private-data/
+test-runtime/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env
+node_modules/
+*.log

@@ -26,6 +26,10 @@ function hydrateDefinitions(){
   S.projects=S.projects.filter(p=>p&&typeof p.key==='string'&&p.key&&typeof p.name==='string');
   if(!S.projects.length) S.projects=PROJECT_DEFAULTS.map(p=>({...p}));
   S.habits=S.habits.filter(c=>c&&typeof c.k==='string'&&c.k&&typeof c.l==='string');
+  S.habits.forEach(c=>{
+    if(c.k==='study'&&c.l==='学习'&&c.icon==='book') c.icon='brain';
+    if(c.k==='journal'&&c.l==='记录'&&!c.archivedAt) c.archivedAt=todayISO();
+  });
   S.projects.forEach(p=>{if(!/^#[0-9a-fA-F]{6}$/.test(p.color||''))p.color='#4e8290';if(!p.short)p.short=p.name.slice(0,4);if(!p.icon)p.icon='target';});
   S.habits.forEach(c=>{if(!/^#[0-9a-fA-F]{6}$/.test(c.color||''))c.color='#4e8290';if(!c.icon)c.icon='check';});
   S.habits.forEach(c=>{if(!c.emoji)c.emoji=HABIT_DEFAULTS.find(x=>x.k===c.k)?.emoji||'✨';});
@@ -460,6 +464,7 @@ function viewToday(){
   const d=todayISO();
   const rec=S.checkins[d]||{};
   const mood=S.moods[d]||'';
+  const todayFocus=focusTasks().slice(0,3);
   let h='<div class="page-head"><div class="page-title">今日</div><div class="page-desc">'+fmtTodayLong()+'</div></div>';
   /* 主记录区：随笔是主操作，状态记录作为侧栏 */
   h+='<div class="today-top-grid"><section>'+sectionTitle('note','今日随笔')
@@ -471,8 +476,8 @@ function viewToday(){
     + MOODS.map(m=>'<button class="mood'+(mood===m?' on':'')+'" style="--mood-color:'+MOOD_META[m].color+'" data-action="mood" data-v="'+m+'"><span class="mood-emoji">'+m+'</span><span>'+MOOD_META[m].label+'</span></button>').join('')
     + '</div></div></section></div>';
   /* 聚焦在前，阅读在后：桌面端并排，窄屏按此顺序纵向排列 */
-  h+='<div class="today-insight-grid"><section>'+sectionTitle('target','今日聚焦')+'<div class="card list-card">'
-    + (function(){ const tts=focusTasks().slice(0,3); return tts.length? tts.map(focusTaskRow).join('') : '<div class="empty compact">今天没有待办。</div>'; })()
+  h+='<div class="today-insight-grid"><section>'+sectionTitle('target','今日聚焦')+'<div class="card list-card'+(todayFocus.length?'':' focus-empty-card')+'">'
+    + (todayFocus.length?todayFocus.map(focusTaskRow).join(''):'<div class="empty compact focus-empty">今天没有待办。</div>')
     + '</div></section><section>'+sectionTitle('book','每日知识阅读')+dailyDigestHTML()+'</section></div>';
   return h;
 }
@@ -861,21 +866,25 @@ function monthCheckinHTML(){
   const offset=(new Date(year,month,1).getDay()+6)%7;
   const count=new Date(year,month+1,0).getDate();
   const monthFirst=isoLocal(new Date(year,month,1)),monthLast=isoLocal(new Date(year,month,count));
-  const shown=(S.habits||[]).filter(c=>(!c.createdAt||c.createdAt<=monthLast)&&(!c.archivedAt||c.archivedAt>monthFirst));
+  const shown=(S.habits||[]).filter(c=>{
+    if(!c.archivedAt) return !c.createdAt||c.createdAt<=monthLast;
+    return Object.keys(S.checkins||{}).some(d=>d>=monthFirst&&d<=monthLast&&!!S.checkins[d]?.[c.k]);
+  });
   let recorded=0, completed=0;
   let cells='<div class="month-weekdays">'+['一','二','三','四','五','六','日'].map(x=>'<span>'+x+'</span>').join('')+'</div><div class="month-grid">';
   for(let i=0;i<offset;i++) cells+='<span class="month-pad" aria-hidden="true"></span>';
   for(let day=1;day<=count;day++){
     const date=isoLocal(new Date(year,month,day));
     const rec=S.checkins[date]||{};
-    const eligible=shown.filter(c=>habitAt(c,date));
-    const active=shown.filter(c=>!!rec[c.k]);
+    const eligible=(S.habits||[]).filter(c=>habitAt(c,date));
+    const dayHabits=shown.filter(c=>c.archivedAt?!!rec[c.k]:habitAt(c,date));
+    const active=dayHabits.filter(c=>!!rec[c.k]);
     const mood=S.moods[date]||'';
     if(active.length||mood) recorded++;
     completed+=active.length;
     const full=eligible.length>0&&eligible.every(c=>rec[c.k]);
     const label=(month+1)+'月'+day+'日：'+(mood?'心情'+MOOD_META[mood]?.label+'；':'')+(active.length?active.map(c=>c.l).join('、'):'未打卡');
-    cells+='<div class="month-day'+(date===todayISO()?' today':'')+(full?' full':'')+'" title="'+esc(label)+'" aria-label="'+esc(label)+'"><span class="month-date">'+day+'</span><span class="month-mood" style="--mood-color:'+(MOOD_META[mood]?.color||'transparent')+'">'+(MOOD_META[mood]?mood:'')+'</span><span class="month-dots">'+shown.map(c=>'<i style="'+habitStyle(c)+'" class="'+(rec[c.k]?'on':'')+(habitAt(c,date)?'':' inactive')+'" title="'+esc(c.l)+'"></i>').join('')+'</span></div>';
+    cells+='<div class="month-day'+(date===todayISO()?' today':'')+(full?' full':'')+'" title="'+esc(label)+'" aria-label="'+esc(label)+'"><span class="month-date">'+day+'</span><span class="month-mood" style="--mood-color:'+(MOOD_META[mood]?.color||'transparent')+'">'+(MOOD_META[mood]?mood:'')+'</span><span class="month-dots">'+dayHabits.map(c=>'<i style="'+habitStyle(c)+'" class="'+(rec[c.k]?'on':'')+'" title="'+esc(c.l)+'"></i>').join('')+'</span></div>';
   }
   cells+='</div>';
   return '<div class="month-checkin"><div class="month-checkin-head"><div><b>'+year+' 年 '+(month+1)+' 月打卡记录</b><span>圆点颜色对应习惯；全部完成的日期会加深</span></div><div class="month-nav"><button class="icon-btn" data-action="checkin-month-prev" aria-label="上个月">'+ic('chevL',16)+'</button><button class="icon-btn" data-action="checkin-month-next" aria-label="下个月">'+ic('chevR',16)+'</button></div></div>'+cells+'<div class="month-checkin-foot"><span class="month-summary">'+recorded+' 天有记录 · '+completed+' 次打卡</span><div class="month-legend">'+shown.map(c=>'<span style="'+habitStyle(c)+'"><i></i>'+esc(c.l)+'</span>').join('')+'</div></div></div>';

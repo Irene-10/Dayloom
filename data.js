@@ -21,8 +21,7 @@ const CHECKIN_DEFS=[
   {k:'sleep',icon:'moon',l:'早睡',emoji:'🌙'},
   {k:'exercise',icon:'activity',l:'运动',emoji:'🏃'},
   {k:'reading',icon:'book',l:'阅读',emoji:'📖'},
-  {k:'study',icon:'book',l:'学习',emoji:'✍️',color:'#7960a8'},
-  {k:'journal',icon:'note',l:'记录',emoji:'📝',color:'#bb7a48'}
+  {k:'study',icon:'brain',l:'学习',emoji:'✍️',color:'#7960a8'}
 ];
 const HABIT_COLORS=['#3e806b','#376b91','#a65e83','#7960a8','#bb7a48','#4e8290'];
 CHECKIN_DEFS[0].color='#3e806b'; CHECKIN_DEFS[1].color='#376b91'; CHECKIN_DEFS[2].color='#a65e83';

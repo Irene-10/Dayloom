@@ -13,7 +13,8 @@ test('公开版默认项目与打卡、空白数据',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','data.js'),'utf8');
   const state=vm.runInNewContext(source+'\n({projects:PROJECT_DEFAULTS.map(p=>p.name),habits:HABIT_DEFAULTS.map(c=>c.l),seed:seed()})');
   assert.deepEqual([...state.projects],['工作事业','长期学习','运动健康','兴趣爱好','日常生活','副业探索']);
-  assert.deepEqual([...state.habits],['早睡','运动','阅读','学习','记录']);
+  assert.deepEqual([...state.habits],['早睡','运动','阅读','学习']);
+  assert.equal(vm.runInNewContext(source+'\nHABIT_DEFAULTS.find(c=>c.k==="study").icon'),'brain');
   assert.equal(state.seed.tasks.length,0);assert.equal(state.seed.knowledge.length,0);
 });
 test('旧版喝水记录保留原义，新打卡使用独立键',()=>{
@@ -25,6 +26,17 @@ test('旧版喝水记录保留原义，新打卡使用独立键',()=>{
   assert.ok([...result.active].includes('study'));
   assert.equal(result.old.l,'喝水');
   assert.equal(result.old.archivedAt,'2026-09-20');
+});
+test('旧版记录打卡隐藏但历史保留，学习图标与阅读区分',()=>{
+  const data=fs.readFileSync(path.join(__dirname,'..','data.js'),'utf8');
+  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+  const migrate=app.match(/function hydrateDefinitions\(\)\{[\s\S]*?^\}/m)?.[0];
+  assert.ok(migrate);
+  const result=vm.runInNewContext(data+'\n'+migrate+'\nlet S={projects:PROJECT_DEFAULTS.map(p=>({...p})),habits:[...HABIT_DEFAULTS.map(c=>({...c})),{k:"journal",l:"记录",icon:"book",emoji:"📝",color:"#4e8290",createdAt:null,archivedAt:null}],checkins:{"2026-09-18":{journal:true}}};S.habits.find(c=>c.k==="study").icon="book";let projFilter="all";function todayISO(){return "2026-09-19";}hydrateDefinitions();({active:CHECKIN_DEFS.map(c=>c.k),journal:S.habits.find(c=>c.k==="journal"),study:S.habits.find(c=>c.k==="study"),historic:S.checkins["2026-09-18"].journal})');
+  assert.deepEqual([...result.active],['sleep','exercise','reading','study']);
+  assert.equal(result.journal.archivedAt,'2026-09-19');
+  assert.equal(result.study.icon,'brain');
+  assert.equal(result.historic,true);
 });
 test('账号隔离、SQLite 持久化 API、版本冲突',async()=>{
   const port=await freePort();

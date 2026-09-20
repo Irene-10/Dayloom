@@ -69,9 +69,13 @@ async function main(){
   }
 
   await shot('dayloom-dashboard.png',`view='home';S.settings.palette='calm';document.documentElement.dataset.palette='calm';render()`);
+  await shot('dayloom-today.png',`view='today';S.settings.palette='calm';document.documentElement.dataset.palette='calm';render()`);
+  await shot('dayloom-calendar.png',`view='calendar';S.settings.palette='calm';document.documentElement.dataset.palette='calm';render()`);
+  await shot('dayloom-projects.png',`view='projects';S.settings.palette='calm';document.documentElement.dataset.palette='calm';render()`);
   await shot('dayloom-knowledge.png',`view='knowledge';S.settings.palette='calm';document.documentElement.dataset.palette='calm';render()`);
   await shot('dayloom-data.png',`view='statistics';S.settings.palette='calm';document.documentElement.dataset.palette='calm';render()`);
-  for(const palette of ['yellow','purple','blue','pink']){
+  await shot('dayloom-settings.png',`view='settings';S.settings.palette='calm';document.documentElement.dataset.palette='calm';render()`,1440,1100);
+  for(const palette of ['yellow','purple','blue','pink','yellow-purple','pink-blue']){
     await shot('theme-'+palette+'.png',`view='home';S.settings.palette='${palette}';document.documentElement.dataset.palette='${palette}';render()`,1120,620);
   }
   socket.close();

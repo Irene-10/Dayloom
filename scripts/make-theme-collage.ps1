@@ -5,10 +5,12 @@ $items = @(
   @{ File = 'theme-yellow.png'; Label = 'Yellow' },
   @{ File = 'theme-purple.png'; Label = 'Purple' },
   @{ File = 'theme-blue.png'; Label = 'Blue' },
-  @{ File = 'theme-pink.png'; Label = 'Pink' }
+  @{ File = 'theme-pink.png'; Label = 'Pink' },
+  @{ File = 'theme-yellow-purple.png'; Label = 'Yellow + Purple' },
+  @{ File = 'theme-pink-blue.png'; Label = 'Pink + Blue' }
 )
 
-$canvas = New-Object System.Drawing.Bitmap 1200, 750
+$canvas = New-Object System.Drawing.Bitmap 1200, 510
 $graphics = [System.Drawing.Graphics]::FromImage($canvas)
 $graphics.Clear([System.Drawing.Color]::FromArgb(247, 250, 249))
 $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
@@ -17,13 +19,13 @@ $font = New-Object System.Drawing.Font 'Segoe UI', 15, ([System.Drawing.FontStyl
 $brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(36, 75, 90))
 
 for ($i = 0; $i -lt $items.Count; $i++) {
-  $col = $i % 2
-  $row = [Math]::Floor($i / 2)
-  $x = 20 + $col * 590
-  $y = 18 + $row * 365
+  $col = $i % 3
+  $row = [Math]::Floor($i / 3)
+  $x = 15 + $col * 395
+  $y = 15 + $row * 250
   $graphics.DrawString($items[$i].Label, $font, $brush, $x, $y)
   $image = [System.Drawing.Image]::FromFile((Join-Path $assetDir $items[$i].File))
-  $graphics.DrawImage($image, $x, ($y + 30), 570, 315)
+  $graphics.DrawImage($image, $x, ($y + 30), 380, 210)
   $image.Dispose()
 }
 

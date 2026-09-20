@@ -54,7 +54,7 @@ test('账号隔离、SQLite 持久化 API、版本冲突',async()=>{
     const page=await fetch(base+'/');
     const html=await page.text();
     assert.equal(page.status,200);
-    assert.match(html,/日常工作台/);
+    assert.match(html,/Dayloom/);
     assert.doesNotMatch(html,/flomo_seed|diary_seed|Irene/i);
     assert.equal((await fetch(base+'/icon.svg')).status,200);
     assert.equal((await fetch(base+'/manifest.webmanifest')).status,200);

@@ -1,1 +1,1 @@
-{"name":"日常工作台","short_name":"工作台","description":"任务、习惯与知识，集中在一个清爽的工作台。","start_url":"/","scope":"/","display":"standalone","background_color":"#f7faf9","theme_color":"#f7faf9","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{"name":"Dayloom","short_name":"Dayloom","description":"把计划、习惯和灵感，收进日常。","start_url":"/","scope":"/","display":"standalone","background_color":"#f7faf9","theme_color":"#f7faf9","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}

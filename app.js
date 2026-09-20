@@ -1,5 +1,5 @@
 /* ============================================================
-   日常工作台 — application logic (classic script)
+   Dayloom — application logic (classic script)
    Depends on data.js (globals: PROJECTS, NAV, ICONS, ic, seed, helpers)
    任务管理 + 打卡记录 + 知识库
    ============================================================ */
@@ -340,7 +340,7 @@ function render(){
 }
 
 function sidebarHTML(){
-  let h='<aside id="sidebar"><div class="brand"><span class="logo">日</span><span>日常工作台</span></div>';
+  let h='<aside id="sidebar"><div class="brand"><span class="logo">D</span><span>Dayloom</span></div>';
   NAV.forEach(n=>{
     const active = (view===n.view)?' active':'';
     let dot='';
@@ -400,7 +400,7 @@ function viewHome(){
   /* Banner：左=今日提示，右=快速添加 */
   h+='<div class="banner">'
     + '<div class="banner-left">'
-    +   '<div class="banner-hi">今天的工作台</div>'
+    +   '<div class="banner-hi">把日常收进 Dayloom</div>'
     +   '<div class="banner-q">'+esc(q)+'</div>'
     +   '<div class="banner-date">'+fmtTodayLong()+'</div>'
     +   '<div class="banner-stats">'
@@ -990,7 +990,7 @@ function viewSettings(){
     h+='<button class="btn ghost sm" data-action="sync-logout">退出账号</button>';
   }else if(remoteSync.available){
     h+='<div class="sync-form"><input id="sync-email" type="email" autocomplete="username" placeholder="邮箱"><input id="sync-password" type="password" autocomplete="current-password" placeholder="密码（注册至少 12 个字符）"><button class="btn primary" data-action="sync-login">登录并同步</button><button class="btn ghost" data-action="sync-register">创建账号</button></div>';
-  }else h+='<p class="muted">如需手机与电脑同步，请通过运行同步服务的同一个网址打开工作台。仅打开 HTML 文件或 GitHub Pages 时仍可本地使用。</p>';
+  }else h+='<p class="muted">如需手机与电脑同步，请通过运行同步服务的同一个网址打开 Dayloom。仅打开 HTML 文件或 GitHub Pages 时仍可本地使用。</p>';
   h+='</div></div>';
 
   /* —— 主题 —— */
@@ -1275,7 +1275,7 @@ function handleDrop(kind,id,drop){
 }
 
 function exportJSON(){ const data=JSON.stringify(S,null,2); const blob=new Blob([data],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='worktable-backup.json'; a.click(); URL.revokeObjectURL(url); toast('已导出'); }
-function importJSON(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(d.version!==4||d.productId!=='everyday-worktable'){ alert('只能导入日常工作台的备份文件'); return; } S=d; hydrateDefinitions();save(); render(); toast('已导入'); }catch(e){ alert('文件无效'); } }; r.readAsText(f); }; inp.click(); }
+function importJSON(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(d.version!==4||d.productId!=='everyday-worktable'){ alert('只能导入 Dayloom 的备份文件'); return; } S=d; hydrateDefinitions();save(); render(); toast('已导入'); }catch(e){ alert('文件无效'); } }; r.readAsText(f); }; inp.click(); }
 
 /* ---------------- INIT ---------------- */
 function init(){

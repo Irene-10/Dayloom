@@ -130,4 +130,4 @@ const server=http.createServer(async(req,res)=>{
     fs.createReadStream(file).pipe(res);
   }catch(e){if(!res.headersSent)json(res,e.status||500,{error:e.status?e.message:'服务器错误'});else res.end();}
 });
-server.listen(PORT,HOST,()=>console.log('日常工作台: http://'+HOST+':'+PORT));
+server.listen(PORT,HOST,()=>console.log('Dayloom: http://'+HOST+':'+PORT));

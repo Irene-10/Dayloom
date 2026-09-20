@@ -6,3 +6,4 @@ test-runtime/
 .env
 node_modules/
 *.log
+.capture-profile/

@@ -8,27 +8,29 @@
 
 </div>
 
-![Dayloom 工作台首页](assets/dayloom-dashboard.png)
+## 首页
 
-## 知识与回顾
+从今天的重点、任务进度到习惯打卡，在一个页面里看清日常节奏。
 
-Dayloom 不只安排待办。知识卡片通过分级标签持续积累，数据页则把任务、习惯和每日心情放进同一条时间线。
+![Dayloom 首页](assets/dayloom-dashboard.png)
 
-<p>
-  <img src="assets/dayloom-knowledge.png" alt="Dayloom 知识库" width="49%">
-  <img src="assets/dayloom-data.png" alt="Dayloom 数据回顾" width="49%">
-</p>
+## 数据
+
+把任务完成情况、连续打卡、每日心情和月度记录放进同一条时间线。
+
+![Dayloom 数据展示](assets/dayloom-data.png)
+
+## 知识库
+
+随手记录想法，用分级标签持续整理，让过去的知识可以被搜索和重新发现。
+
+![Dayloom 知识库](assets/dayloom-knowledge.png)
 
 ## 选择喜欢的颜色
 
 内容与功能保持一致，可以在设置中随时切换整套界面配色。
 
-<p>
-  <img src="assets/theme-yellow.png" alt="Dayloom 黄色主题" width="24%">
-  <img src="assets/theme-purple.png" alt="Dayloom 紫色主题" width="24%">
-  <img src="assets/theme-blue.png" alt="Dayloom 蓝色主题" width="24%">
-  <img src="assets/theme-pink.png" alt="Dayloom 粉色主题" width="24%">
-</p>
+![Dayloom 配色展示](assets/dayloom-themes.png)
 
 ## 你可以用 Dayloom 做什么
 

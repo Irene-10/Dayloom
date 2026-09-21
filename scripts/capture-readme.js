@@ -29,7 +29,7 @@ async function connect(){
 
 const demoState=`(()=>{
   const d=seed(), now=new Date(), today=isoLocal(now), tomorrow=addDaysISO(today,1);
-  d.settings.name='Irene';
+  d.settings.name='Steve';
   d.tasks=[
     {id:'demo1',title:'整理本周的重点计划',project:'work',priority:'high',status:'inprogress',due:today,time:'09:30',completed:false,notes:''},
     {id:'demo2',title:'阅读并整理学习笔记',project:'learning',priority:'medium',status:'backlog',due:today,time:'14:00',completed:false,notes:''},
@@ -40,15 +40,9 @@ const demoState=`(()=>{
   const moods=['🙂','🤩','😐','🙂','🙂','😕','🤩','🙂','😐','🙂','🤩','🙂','🙂','🙂'];
   patterns.forEach((p,i)=>{const date=addDaysISO(today,i-13);d.checkins[date]={sleep:!!p[0],exercise:!!p[1],reading:!!p[2],study:!!p[3]};d.moods[date]=moods[i];});
   d.notes[today]='今天专注完成最重要的事，也给新的想法留一点空间。';
-  const cards=[
-    ['稳定的进步来自可持续的小行动，而不是偶尔的高强度投入。',['成长/习惯']],
-    ['记录的价值不只是保存答案，也是在为未来留下重新思考的入口。',['知识管理/记录']],
-    ['当任务太大时，把下一步缩小到可以立刻开始，行动阻力就会明显下降。',['效率/行动']],
-    ['阅读不是收集更多信息，而是让新观点与已有经验发生联系。',['学习/阅读']],
-    ['好的系统应该帮助人看见重点，同时允许生活保留弹性。',['产品/设计']]
-  ];
+  const cards=[['但是太阳，它每时每刻都是夕阳也都是旭日。',['书籍（示例）/《我与地坛》']]];
   d.knowledge=cards.map((c,i)=>({id:'demo-k'+i,text:c[0],tags:c[1],created:new Date(now.getTime()-i*86400000).toISOString(),favorite:i===0,reviewCount:i}));
-  S=d;hydrateDefinitions();save();render();
+  S=d;hydrateDefinitions();render();
 })()`;
 
 async function main(){

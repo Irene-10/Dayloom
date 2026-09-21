@@ -7,7 +7,10 @@
 const DB_KEY = 'everyday_worktable_public_v1';
 const SYNC_DIRTY_KEY='everyday_worktable_sync_dirty_v1';
 let S = load() || seed();
-let remoteSync={available:false,user:null,enabled:false,revision:0,pushing:false,dirty:false,hydrating:false,ready:false,conflict:false,status:'正在检查同步服务',timer:null};
+let remoteSync={mode:'browser',dataPath:'',available:false,user:null,enabled:false,revision:0,pushing:false,dirty:false,hydrating:false,ready:false,conflict:false,status:'正在连接数据存储…',timer:null};
+let aiService={available:false,configured:false,baseUrl:'',model:'',hasKey:false,generating:false,error:''};
+let pendingAiCards=[];
+let digestShuffle=0;
 let view = 'home';
 let viewArg = null;          // detail id
 let qaOpen = false;          // quick-add menu
@@ -55,12 +58,12 @@ function load(){
 let lastSaveError='';
 let useIndexedKnowledge=false;
 function save(){
+  if(remoteSync.enabled&&!remoteSync.hydrating) queueRemoteSync();
   try{
     const c=Object.assign({},S);
     if(useIndexedKnowledge){ c.knowledge=[]; c.knowledgeStore='indexeddb'; persistKnowledgeLocal(S.knowledge); }
     localStorage.setItem(DB_KEY, JSON.stringify(c));
-    if(remoteSync.enabled&&!remoteSync.hydrating) queueRemoteSync();
-    else if(remoteSync.ready&&!remoteSync.hydrating&&S._cloudAccount) localStorage.setItem(SYNC_DIRTY_KEY,'1');
+    if(remoteSync.ready&&!remoteSync.hydrating&&S._cloudAccount) localStorage.setItem(SYNC_DIRTY_KEY,'1');
     lastSaveError='';
     return true;
   }catch(e){
@@ -97,10 +100,19 @@ function initKnowledgeStore(){
     save(); render(); initRemoteSync();
   }).catch(()=>{ useIndexedKnowledge=false; initRemoteSync(); });
 }
-function hasLocalContent(){return !!(S.tasks.length||S.knowledge.length||Object.keys(S.checkins||{}).length||Object.keys(S.notes||{}).length||Object.keys(S.moods||{}).length||JSON.stringify(S.projects)!==JSON.stringify(PROJECT_DEFAULTS)||JSON.stringify(S.habits)!==JSON.stringify(HABIT_DEFAULTS));}
-function syncStatus(message){remoteSync.status=message;if(view==='settings')render();}
+function hasLocalContent(){
+  const initial=seed(),sample=initial.knowledge[0],cards=S.knowledge||[];
+  const sampleUntouched=cards.length===1&&cards[0].id===sample.id&&cards[0].text===sample.text&&JSON.stringify(cards[0].tags||[])===JSON.stringify(sample.tags)&&!cards[0].favorite&&!(cards[0].reviewCount||0)&&!cards[0].lastReviewed;
+  return !!(S.tasks.length||!sampleUntouched||JSON.stringify(S.knowledgeTags||[])!==JSON.stringify(initial.knowledgeTags)||Object.keys(S.checkins||{}).length||Object.keys(S.notes||{}).length||Object.keys(S.moods||{}).length||JSON.stringify(S.settings)!==JSON.stringify(initial.settings)||JSON.stringify(S.projects)!==JSON.stringify(PROJECT_DEFAULTS)||JSON.stringify(S.habits)!==JSON.stringify(HABIT_DEFAULTS));
+}
+function syncStatus(message,refresh=true){
+  if(remoteSync.mode==='local') message=message.replaceAll('云端','电脑数据库').replaceAll('上传','写入').replaceAll('补传','补存').replaceAll('本机属于另一账号','浏览器缓存属于另一工作空间').replaceAll('本机与电脑数据库','浏览器与电脑数据库');
+  remoteSync.status=message;
+  const el=document.getElementById('save-status');if(el) el.textContent=message;
+  if(refresh&&view==='settings')render();
+}
 async function syncFetch(path,options={}){
-  const response=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...options});
+  const response=await fetch(path,{credentials:'same-origin',signal:AbortSignal.timeout(8000),headers:{'Content-Type':'application/json'},...options});
   const data=await response.json();
   if(!response.ok) throw Object.assign(new Error(data.error||'同步请求失败'),{status:response.status,data});
   return data;
@@ -109,6 +121,8 @@ function applyRemoteState(state,revision){
   remoteSync.hydrating=true;
   S=state;
   hydrateDefinitions();
+  document.documentElement.dataset.theme=S.settings.theme||'light';
+  document.documentElement.dataset.palette=S.settings.palette||'calm';
   S._cloudRevision=revision;
   S._cloudAccount=remoteSync.user&&remoteSync.user.email;
   remoteSync.revision=revision;
@@ -118,8 +132,12 @@ function applyRemoteState(state,revision){
   render();
 }
 async function initRemoteSync(){
+  document.getElementById('app').inert=true;
   try{
+    if(location.protocol==='file:'){syncStatus('浏览器保存 · 请定期导出备份');return;}
     const me=await syncFetch('/api/me');
+    remoteSync.mode=me.mode||'accounts';
+    remoteSync.dataPath=me.dataPath||'';
     remoteSync.available=true;
     remoteSync.user=me.user;
     if(!me.user){syncStatus('未登录 · 当前仅保存在本机');return;}
@@ -129,7 +147,10 @@ async function initRemoteSync(){
     if(S._cloudAccount&&S._cloudAccount!==me.user.email){
       remoteSync.enabled=false;remoteSync.conflict=true;syncStatus('本机属于另一账号，请选择保留哪一份数据');return;
     }
-    if(!remote.state){remoteSync.enabled=true;remoteSync.dirty=true;syncStatus('正在上传本机数据');queueRemoteSync();return;}
+    if(!remote.state){
+      if(S._cloudAccount&&S._cloudRevision){remoteSync.enabled=false;remoteSync.conflict=true;syncStatus('数据库为空，浏览器有旧数据。请确认是否恢复');return;}
+      remoteSync.enabled=true;remoteSync.dirty=true;syncStatus('正在上传本机数据');queueRemoteSync();return;
+    }
     if(localDirty&&S._cloudAccount===me.user.email&&S._cloudRevision===remote.revision){remoteSync.enabled=true;remoteSync.dirty=true;syncStatus('正在补传本机修改');queueRemoteSync();return;}
     if(localDirty||(hasLocalContent()&&S._cloudRevision==null)){
       remoteSync.enabled=false;remoteSync.conflict=true;syncStatus('本机与云端都有数据，请选择保留哪一份');return;
@@ -137,12 +158,13 @@ async function initRemoteSync(){
     applyRemoteState(remote.state,remote.revision);
     remoteSync.enabled=true;remoteSync.conflict=false;syncStatus('已同步 · 数据保存在本机与云端');
   }catch(e){remoteSync.available=false;remoteSync.enabled=false;syncStatus('同步服务不可用 · 当前仅保存在本机');}
-  finally{remoteSync.ready=true;}
+  finally{remoteSync.ready=true;document.getElementById('app').inert=false;initAiService();}
 }
 function queueRemoteSync(){
   if(!remoteSync.enabled||remoteSync.hydrating) return;
   remoteSync.dirty=true;
-  localStorage.setItem(SYNC_DIRTY_KEY,'1');
+  try{localStorage.setItem(SYNC_DIRTY_KEY,'1');}catch{}
+  syncStatus(remoteSync.mode==='local'?'正在保存到电脑…':'正在同步…',false);
   clearTimeout(remoteSync.timer);
   remoteSync.timer=setTimeout(flushRemoteSync,650);
 }
@@ -156,12 +178,13 @@ async function flushRemoteSync(){
     S._cloudAccount=remoteSync.user&&remoteSync.user.email;
     remoteSync.hydrating=true;save();remoteSync.hydrating=false;
     if(remoteSync.dirty) setTimeout(flushRemoteSync,0);
-    else {localStorage.removeItem(SYNC_DIRTY_KEY);syncStatus('已同步 · 数据保存在本机与云端');}
+    else {localStorage.removeItem(SYNC_DIRTY_KEY);syncStatus(remoteSync.mode==='local'?'已保存到电脑数据库':'已同步 · 数据保存在本机与云端');}
   }catch(e){
     remoteSync.dirty=true;
     if(e.status===409){remoteSync.enabled=false;remoteSync.conflict=true;syncStatus('检测到另一台设备的新修改，请选择保留哪一份');}
     else if(e.status===401){remoteSync.enabled=false;syncStatus('登录已失效 · 请重新登录后同步');}
-    else {syncStatus('暂时离线 · 修改保存在本机，联网后会重试');setTimeout(flushRemoteSync,15000);}
+    else if(e.status===413||e.status===400){remoteSync.enabled=false;syncStatus('数据库未保存：'+e.message+'。请导出备份');}
+    else {syncStatus('服务暂不可用 · 修改暂存在浏览器，15 秒后重试');setTimeout(flushRemoteSync,15000);}
   }finally{remoteSync.pushing=false;}
 }
 async function submitSyncAuth(mode){
@@ -176,10 +199,10 @@ async function resolveSyncConflict(useLocal){
   try{
     const remote=await syncFetch('/api/state');
     if(useLocal){
-      if(!confirm('用本机数据覆盖云端数据？另一台设备尚未同步的内容可能丢失。建议先导出 JSON 备份。')) return;
+      if(!confirm('用当前浏览器的数据覆盖数据库？建议先分别导出备份，未保留的内容会被替换。')) return;
       remoteSync.revision=remote.revision;remoteSync.enabled=true;remoteSync.conflict=false;queueRemoteSync();syncStatus('正在上传本机数据');
     }else{
-      if(!confirm('用云端数据替换本机数据？建议先导出 JSON 备份。')) return;
+      if(!confirm('用数据库的数据替换当前浏览器内容？建议先导出 JSON 备份。')) return;
       applyRemoteState(remote.state||seed(),remote.revision);remoteSync.enabled=true;remoteSync.conflict=false;syncStatus('已同步 · 数据保存在本机与云端');
     }
   }catch(e){toast(e.message);}
@@ -192,6 +215,54 @@ async function logoutSyncAccount(){
   try{await clearKnowledgeLocal();}catch(e){toast('知识卡片的本机副本未能清除，请勿在共用设备上继续使用');return;}
   S=seed();hydrateDefinitions();localStorage.removeItem(SYNC_DIRTY_KEY);save();
   syncStatus('已退出 · 本机账号数据已清除');render();
+}
+async function aiFetch(path,options={},timeout=12000){
+  const response=await fetch(path,{credentials:'same-origin',signal:AbortSignal.timeout(timeout),headers:{'Content-Type':'application/json'},...options});
+  const data=await response.json().catch(()=>({error:'AI 服务返回了无法识别的数据'}));
+  if(!response.ok) throw Object.assign(new Error(data.error||'AI 请求失败'),{status:response.status});
+  return data;
+}
+async function initAiService(){
+  if(location.protocol==='file:'||remoteSync.mode!=='local'){aiService.available=false;return;}
+  try{const data=await aiFetch('/api/ai/settings');aiService={...aiService,...data,available:true,error:''};}
+  catch(e){aiService.available=false;aiService.error=e.message;}
+  render();
+}
+async function saveAiSettings(){
+  const baseUrl=((document.getElementById('ai-base-url')||{}).value||'').trim();
+  const model=((document.getElementById('ai-model')||{}).value||'').trim();
+  const apiKey=((document.getElementById('ai-api-key')||{}).value||'').trim();
+  try{const data=await aiFetch('/api/ai/settings',{method:'PUT',body:JSON.stringify({baseUrl,model,apiKey})});aiService={...aiService,...data,available:true,error:''};render();toast('AI 设置已保存');}
+  catch(e){toast(e.message);}
+}
+async function testAiSettings(){
+  const button=document.querySelector('[data-action="ai-test"]');if(button){button.disabled=true;button.textContent='测试中…';}
+  try{await aiFetch('/api/ai/test',{method:'POST',body:'{}'},95000);toast('连接成功');}
+  catch(e){toast(e.message);}
+  finally{if(view==='settings')render();}
+}
+async function clearAiSettings(){
+  if(!confirm('清除这台电脑保存的 AI 地址、模型和 API Key？')) return;
+  try{await aiFetch('/api/ai/settings',{method:'DELETE',body:'{}'});aiService={...aiService,configured:false,baseUrl:'',model:'',hasKey:false,error:''};render();toast('AI 设置已清除');}
+  catch(e){toast(e.message);}
+}
+function openAiPreview(){
+  const cards=digestCards().cards.slice(0,6);
+  if(cards.length<2){toast('至少需要两张知识卡片');return;}
+  pendingAiCards=cards;
+  const rows=cards.map((card,i)=>'<div class="ai-send-card"><span>'+(i+1)+'</span><div><b>'+esc(compactText(card.text,82))+'</b><small>'+esc((card.tags||[]).map(x=>'#'+x).join(' ')||'未分类')+'</small></div></div>').join('');
+  modalRoot.innerHTML='<div class="overlay" data-overlay><div class="modal ai-preview-modal"><h3>生成知识碰撞</h3><p class="muted">以下卡片将发送到你配置的 AI 服务。</p><div class="ai-send-list">'+rows+'</div><div class="modal-actions"><button class="btn ghost" data-action="modal-cancel">取消</button><button class="btn primary" data-action="ai-generate-confirm">确认并生成</button></div></div></div>';
+}
+async function generateAiReading(){
+  const cards=pendingAiCards.map(card=>({id:card.id,text:card.text,tags:card.tags||[],created:card.created||''}));pendingAiCards=[];
+  if(cards.length<2) return;
+  aiService.generating=true;render();
+  try{
+    const result=await aiFetch('/api/ai/digest',{method:'POST',body:JSON.stringify({cards})},95000);
+    if(!S.aiReadings) S.aiReadings={};
+    S.aiReadings[todayISO()]={...result,createdAt:new Date().toISOString()};save();render();toast('今日阅读已生成');
+  }catch(e){aiService.error=e.message;toast(e.message);}
+  finally{aiService.generating=false;render();}
 }
 function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function todayISO(){ return isoLocal(todayMid()); }
@@ -279,14 +350,33 @@ function digestCards(){
     const br=dayDiff(b.lastReviewed||b.created||todayISO(),todayISO())*100+(hashText(todayISO()+b.id)%97);
     return br-ar;
   });
+  if(pool.length>1&&digestShuffle){const shift=digestShuffle%pool.length;pool=pool.slice(shift).concat(pool.slice(0,shift));}
   return {topic:topic,cards:pool.slice(0,Math.min(4,pool.length))};
+}
+function aiReadingToday(){return S.aiReadings&&S.aiReadings[todayISO()];}
+function localReviewHTML(d){
+  const main=d.cards[0],related=d.cards.slice(1,4);
+  const created=String(main.created||todayISO()).slice(0,10),age=dayDiff(created,todayISO());
+  const tags=(main.tags||[]).map(t=>'<span class="tag">#'+esc(t)+'</span>').join('');
+  const nearby=related.map(k=>'<button class="local-related" data-action="kb-open" data-id="'+esc(k.id)+'"><small>'+esc(String(k.created||'').slice(0,10)||'旧卡片')+'</small><b>'+esc(compactText(k.text,120))+'</b></button>').join('');
+  const canExpand=String(main.text||'').replace(/\s+/g,' ').trim().length>150;
+  return '<article class="knowledge-digest local-review"><div class="digest-head"><div><h2>今日重读</h2></div><span class="local-badge">本地</span></div>'
+    +'<div class="review-reason"><i></i><span>'+(age?age+' 天前记录':'今天记录')+(main.reviewCount?' · 已回顾 '+main.reviewCount+' 次':' · 尚未回顾')+'</span></div>'
+    +'<div class="review-focus"><span>'+esc(created)+'</span><p class="review-text">'+esc(main.text)+'</p><div class="review-tags">'+tags+'</div><div class="review-inline-actions">'+(canExpand?'<button class="text-action" data-action="review-expand" aria-expanded="false">展开全文</button>':'')+'<button class="text-action" data-action="kb-open" data-id="'+esc(main.id)+'">打开原卡片</button></div></div>'
+    +'<div class="review-actions"><button class="btn ghost sm" data-action="ai-reflect" data-id="'+esc(main.id)+'">写下新想法</button><button class="btn ghost sm" data-action="kb-favorite" data-id="'+esc(main.id)+'">'+(main.favorite?'已收藏':'收藏')+'</button><button class="btn ghost sm" data-action="digest-shuffle">换一张</button>'+(aiService.configured?'<button class="btn primary sm" data-action="ai-preview">生成知识碰撞</button>':'')+'</div>'
+    +(nearby?'<div class="local-related-wrap"><h3>相关卡片</h3><div>'+nearby+'</div></div>':'')+'</article>';
+}
+function aiReadingHTML(reading){
+  const d=reading.digest||reading;
+  const connections=(d.connections||[]).map(item=>'<div class="ai-connection"><b>'+esc(item.title)+'</b><p>'+esc(item.body)+'</p><div>'+((item.sourceIds||[]).map(id=>{const n=(S.knowledge||[]).find(k=>k.id===id);return n?'<button data-action="kb-open" data-id="'+esc(id)+'">'+esc(compactText(n.text,28))+'</button>':'';}).join(''))+'</div></div>').join('');
+  return '<article class="knowledge-digest ai-reading"><div class="digest-head"><div><h2>'+esc(d.title)+'</h2></div><span class="local-badge">AI</span></div><p class="ai-lead">'+esc(d.lead)+'</p><div class="ai-insight">'+esc(d.insight)+'</div>'+(connections?'<div class="ai-connections">'+connections+'</div>':'')+(d.tension?'<div class="ai-tension"><b>另一面</b><p>'+esc(d.tension)+'</p></div>':'')+(d.action?'<div class="ai-action"><b>今天可以试试</b><p>'+esc(d.action)+'</p></div>':'')+(d.question?'<div class="ai-question">'+esc(d.question)+'</div>':'')+'<div class="review-actions"><button class="btn ghost sm" data-action="ai-preview">重新生成</button><button class="btn ghost sm" data-action="ai-remove">返回本地回顾</button></div></article>';
 }
 function dailyDigestHTML(){
   const d=digestCards();
-  if(!d.cards.length) return '<div class="knowledge-digest empty-digest"><div><b>还没有可供阅读的知识</b><p>先在知识库记录几张卡片，之后可由 AI 从卡片之间提炼洞察。</p></div><button class="btn primary sm" data-nav="knowledge">去记录</button></div>';
-  const topic=d.topic||'跨卡片洞察';
-  const refs=d.cards.map((k,i)=>'<button class="digest-ref" data-action="kb-open" data-id="'+esc(k.id)+'"><span>['+(i+1)+']</span><div><b>'+esc(compactText(k.text,54))+'</b><small>'+esc((k.tags||[]).map(t=>'#'+t).join(' ')||'未分类')+'</small></div></button>').join('');
-  return '<article class="knowledge-digest ai-pending"><div class="digest-head"><div><span class="eyebrow">每日知识阅读 · '+todayISO()+'</span><h2>'+esc(topic)+'</h2></div><span class="local-badge pending">未连接 AI</span></div><div class="digest-copy ai-note"><b>这里不再展示规则拼接的“假总结”</b><p>连接 AI 后，它会比较不同卡片，提炼共性与矛盾，并延伸出值得验证的新问题。当前仅在本地选出今日候选卡片，不会上传任何内容。</p></div><div class="digest-refs"><h3>今日候选卡片</h3>'+refs+'</div><div class="digest-actions"><button class="btn ghost sm" data-nav="knowledge">打开知识库</button></div></article>';
+  if(!d.cards.length) return '<div class="knowledge-digest empty-digest"><div><b>还没有知识卡片</b><p>记录几张卡片后，这里会每天带回一张。</p></div><button class="btn primary sm" data-nav="knowledge">去记录</button></div>';
+  if(aiService.generating) return '<article class="knowledge-digest digest-loading"><div class="digest-head"><div><h2>正在寻找卡片之间的联系</h2></div><span class="local-badge">AI</span></div><div class="digest-loader"><i></i><span>生成通常需要几十秒</span></div></article>';
+  const reading=aiReadingToday();
+  return reading?aiReadingHTML(reading):localReviewHTML(d);
 }
 
 /* ---------------- reusable bits ---------------- */
@@ -348,7 +438,7 @@ function sidebarHTML(){
     const ico = ICONS[n.icon] ? '<span class="ico">'+ic(n.icon,17)+'</span>' : '<span class="ico">'+n.icon+'</span>';
     h+='<button class="nav-item'+active+'" data-nav="'+n.view+'" aria-current="'+(active?'page':'false')+'">'+ico+'<span>'+esc(n.label)+'</span>'+dot+'</button>';
   });
-  h+='<div class="sidebar-foot">本地保存 · 自动存储</div></aside>';
+  h+='<div class="sidebar-foot" id="save-status" role="status">'+esc(remoteSync.status)+'</div></aside>';
   h+='<div class="scrim" id="scrim"></div>';
   return h;
 }
@@ -362,7 +452,8 @@ function topbarHTML(){
       + items.map(i=>'<button class="nav-item" data-action="qa" data-type="'+i[0]+'" style="border-radius:8px;width:100%">'+esc(i[1])+'</button>').join('')
       + '</div><div id="qa-back" style="position:fixed;inset:0;z-index:30"></div>';
   }
-  return '<div class="greet">'+g+', '+esc(S.settings.name)+'</div>'
+  const displayName=String(S.settings.name||'').trim();
+  return '<div class="greet">'+g+(displayName?'，'+esc(displayName):'')+'</div>'
     + '<div class="date">'+fmtTodayLong()+'</div>'
     + '<div class="search"><span class="si">'+ic('search',16)+'</span><input id="globsearch" placeholder="搜索任务 / 知识..." data-action="search" readonly aria-label="打开全局搜索"/></div>'
     + '<button class="btn primary" data-action="add">'+ic('plus',16)+' 添加</button>'
@@ -969,11 +1060,11 @@ function paletteChoiceHTML(option){
 }
 function viewSettings(){
   const storageKb=Math.max(1,Math.round(JSON.stringify(S).length/1024));
-  let h='<div class="page-head"><div class="page-title">设置</div><div class="page-desc">内容优先保存在本机；登录后可与另一台设备同步。</div></div>';
+  let h='<div class="page-head"><div class="page-title">设置</div><div class="page-desc">调整你的项目、习惯和界面，查看数据保存位置。</div></div>';
 
   /* —— 身份 —— */
   h+='<div class="settings-card"><div class="settings-h">身份</div><div class="settings-b">';
-  h+='<div class="field"><label>显示名称</label><input id="set-name" value="'+esc(S.settings.name)+'"></div>';
+  h+='<div class="field"><label>显示名称（可选）</label><input id="set-name" value="'+esc(S.settings.name)+'" placeholder="例如：小雨"></div>';
   h+='</div></div>';
 
   h+='<div class="settings-card"><div class="settings-h">项目与打卡</div><div class="settings-b"><p class="muted">名称和颜色会同步到各个页面。删除项目时，其任务会移到另一个项目；删除打卡不会清除历史记录。</p>';
@@ -982,15 +1073,27 @@ function viewSettings(){
   h+='<div class="manage-list-head"><b>打卡</b><button class="btn ghost sm" data-action="habit-add">'+ic('plus',13)+' 新增</button></div><div class="manage-list">'
     +CHECKIN_DEFS.map(c=>'<div class="manage-row" style="--item-color:'+esc(c.color)+'"><span class="manage-swatch"></span><span>'+esc(c.l)+'</span><button class="btn ghost tiny" data-action="habit-edit" data-key="'+esc(c.k)+'">编辑</button><button class="btn ghost tiny" data-action="habit-delete" data-key="'+esc(c.k)+'">删除</button></div>').join('')+'</div></div></div>';
 
-  h+='<div class="settings-card"><div class="settings-h">跨设备同步</div><div class="settings-b">'
+  h+='<div class="settings-card"><div class="settings-h">'+(remoteSync.mode==='local'?'电脑存储':'数据存储与同步')+'</div><div class="settings-b">'
     +'<p class="sync-status">'+esc(remoteSync.status)+'</p>';
-  if(remoteSync.user){
+  if(remoteSync.mode==='local'){
+    h+='<p>无需注册，任务、笔记、习惯和设置自动保存在这台电脑。</p><p class="muted" style="overflow-wrap:anywhere">数据文件：'+esc(remoteSync.dataPath)+'</p>';
+    if(remoteSync.conflict) h+='<div class="sync-conflict"><p>浏览器和数据库有不同版本。先导出当前内容备份，再选择要保留的版本。</p><button class="btn" data-action="sync-use-cloud">读取电脑数据库</button><button class="btn" data-action="sync-use-local">保留当前浏览器内容</button></div>';
+  }else if(remoteSync.user){
     h+='<p class="muted">当前账号：'+esc(remoteSync.user.email)+'</p>';
     if(remoteSync.conflict) h+='<div class="sync-conflict"><p>两份数据不能自动合并。先导出本机 JSON 备份，再选择要保留的版本。</p><button class="btn" data-action="sync-use-cloud">使用云端数据</button><button class="btn" data-action="sync-use-local">使用本机数据</button></div>';
     h+='<button class="btn ghost sm" data-action="sync-logout">退出账号</button>';
   }else if(remoteSync.available){
     h+='<div class="sync-form"><input id="sync-email" type="email" autocomplete="username" placeholder="邮箱"><input id="sync-password" type="password" autocomplete="current-password" placeholder="密码（注册至少 12 个字符）"><button class="btn primary" data-action="sync-login">登录并同步</button><button class="btn ghost" data-action="sync-register">创建账号</button></div>';
   }else h+='<p class="muted">如需手机与电脑同步，请通过运行同步服务的同一个网址打开 Dayloom。仅打开 HTML 文件或 GitHub Pages 时仍可本地使用。</p>';
+  if(!remoteSync.available&&location.protocol!=='file:') h+='<button class="btn" data-action="storage-retry">重新连接本机服务</button>';
+  h+='</div></div>';
+
+  /* —— AI 服务 —— */
+  h+='<div class="settings-card"><div class="settings-h">AI 阅读</div><div class="settings-b">';
+  if(aiService.available){
+    h+='<div class="ai-settings-grid"><div class="field"><label>API 地址</label><input id="ai-base-url" type="url" value="'+esc(aiService.baseUrl)+'" placeholder="https://example.com/v1"></div><div class="field"><label>模型名称</label><input id="ai-model" value="'+esc(aiService.model)+'" placeholder="模型名称"></div><div class="field ai-key-field"><label>API Key</label><input id="ai-api-key" type="password" autocomplete="off" placeholder="'+(aiService.hasKey?'已保存，留空则不修改':'本地模型可以留空')+'"></div></div>'
+      +'<div class="settings-actions"><button class="btn primary" data-action="ai-save">保存设置</button>'+(aiService.configured?'<button class="btn" data-action="ai-test">测试连接</button><button class="btn ghost" data-action="ai-clear">清除</button>':'')+'</div><p class="muted ai-privacy-note">生成前会显示将要发送的卡片；API Key 只保存在这台电脑，不进入 JSON 备份。</p>';
+  }else h+='<p class="muted">通过本机服务地址打开后，可配置兼容的 AI 接口。直接打开 HTML 时仍可使用“今日重读”。</p>';
   h+='</div></div>';
 
   /* —— 主题 —— */
@@ -1169,6 +1272,17 @@ function route(t){
   if(a==='theme-toggle'){ const nv=(document.documentElement.dataset.theme==='dark')?'light':'dark'; applyTheme(nv); return; }
   if(a==='theme-set'){ applyTheme(t.dataset.v); return; }
   if(a==='palette-set'){ applyPalette(t.dataset.v); return; }
+  if(a==='storage-retry'){initRemoteSync();return;}
+  if(a==='ai-save'){saveAiSettings();return;}
+  if(a==='ai-test'){testAiSettings();return;}
+  if(a==='ai-clear'){clearAiSettings();return;}
+  if(a==='ai-preview'){openAiPreview();return;}
+  if(a==='ai-generate-confirm'){generateAiReading();return;}
+  if(a==='modal-cancel'){return;}
+  if(a==='digest-shuffle'){digestShuffle++;render();return;}
+  if(a==='review-expand'){const card=t.closest('.review-focus');const text=card&&card.querySelector('.review-text');if(!text)return;const expanded=text.classList.toggle('expanded');t.textContent=expanded?'收起全文':'展开全文';t.setAttribute('aria-expanded',expanded?'true':'false');return;}
+  if(a==='ai-remove'){if(S.aiReadings)delete S.aiReadings[todayISO()];save();render();return;}
+  if(a==='ai-reflect'){const k=S.knowledge.find(z=>z.id===t.dataset.id);if(k){kbSelTags=new Set(k.tags||[]);setView('knowledge');setTimeout(()=>{const el=document.getElementById('kb-in');if(el)el.focus();},60);}return;}
   if(a==='sync-login'||a==='sync-register'){ submitSyncAuth(a==='sync-login'?'login':'register'); return; }
   if(a==='sync-use-cloud'||a==='sync-use-local'){ resolveSyncConflict(a==='sync-use-local'); return; }
   if(a==='sync-logout'){ logoutSyncAccount(); return; }
@@ -1228,7 +1342,7 @@ function route(t){
   if(a==='add-on-date'){ openTaskForm({project:projFilter==='all'?PROJ_ORDER[0]:projFilter,priority:'medium',status:'backlog',due:t.dataset.date,time:'',notes:''}); return; }
   if(a==='export'){ exportJSON(); return; }
   if(a==='import'){ importJSON(); return; }
-  if(a==='reset-demo'){ if(confirm('确定清空全部内容吗？'+(remoteSync.enabled?'同步开启时，这也会清空云端数据。':'')+'请先导出 JSON 备份。此操作不可撤销。')){ S=seed(); hydrateDefinitions();save(); render(); toast('已清空'); } return; }
+  if(a==='reset-demo'){ if(confirm('确定清空全部内容吗？'+(remoteSync.enabled?'这也会清空当前连接的数据库内容。':'')+'请先导出 JSON 备份。此操作不可撤销。')){ S=seed(); hydrateDefinitions();save(); render(); toast('已清空'); } return; }
 }
 
 function applyTheme(nv){ if(nv==='dark') document.documentElement.dataset.theme='dark'; else delete document.documentElement.dataset.theme; S.settings.theme=nv; save(); render(); toast(nv==='dark'?'已切换为暗色':'已切换为亮色'); }
@@ -1281,7 +1395,8 @@ function importJSON(){ const inp=document.createElement('input'); inp.type='file
 function init(){
   if(!S || S.version!==4 || !Array.isArray(S.tasks)){ S=seed(); }
   /* 一次性清空历史任务（用户要求从零开始） */
-  if(!S.settings) S.settings={name:'你',theme:'light'};
+  if(!S.settings) S.settings={name:'Steve',theme:'light'};
+  if(S.settings.name==='你') S.settings.name='Steve';
   hydrateDefinitions();
   if(S.settings.theme==='dark') document.documentElement.dataset.theme='dark';
   if(!PALETTE_OPTIONS.some(option=>option.key===S.settings.palette)) S.settings.palette='calm';
@@ -1289,6 +1404,7 @@ function init(){
   if(!S.checkins||typeof S.checkins!=='object'||Array.isArray(S.checkins)) S.checkins={};
   if(!S.moods) S.moods={};
   if(!S.notes) S.notes={};
+  if(!S.aiReadings||typeof S.aiReadings!=='object'||Array.isArray(S.aiReadings)) S.aiReadings={};
   if(!Array.isArray(S.knowledge)) S.knowledge=[];
   /* 知识库：迁移 tag→tags 数组，并确保 tags 数组存在 */
   S.knowledge.forEach(k=>{ if(!Array.isArray(k.tags)) k.tags=k.tag?[k.tag]:[]; k.tags=k.tags.map(kbNormTag).filter(Boolean); if(k.favorite==null) k.favorite=false; if(k.reviewCount==null) k.reviewCount=0; delete k.project; });
@@ -1300,12 +1416,17 @@ function init(){
   bindModalClicks();
   const app=document.getElementById('app');
   app.addEventListener('click',onClick);
+  app.addEventListener('change',e=>{if(e.target&&e.target.id==='set-name'){S.settings.name=e.target.value.trim();save();render();toast(S.settings.name?'称呼已更新':'已隐藏称呼');}});
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape') closeModal();
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); openSearch(); }
     if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='a'){ e.preventDefault(); openTaskForm(null); }
   });
   render();
+  document.getElementById('app').inert=true;
   initKnowledgeStore();
 }
+window.addEventListener('beforeunload',event=>{
+  if(remoteSync.dirty||remoteSync.pushing){event.preventDefault();event.returnValue='';}
+});
 init();

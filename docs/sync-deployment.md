@@ -1,6 +1,6 @@
 # 电脑与手机同步：部署指引
 
-本仓库已经包含账号、同步 API 和 SQLite 存储；**仅打开 HTML 文件不会跨设备同步**。下面是一套以 Ubuntu 服务器、自有域名和 Caddy 为例的部署路径。还没有执行部署，也不需要现在购买服务器。公开给其他人注册使用之前，先做独立安全审查、限流与备份恢复演练。
+本仓库默认是无需登录的本机模式，只允许回环地址访问。以下文档仅供实验性的账号服务部署，需要显式设置 `DAYLOOM_MODE=accounts`。**仅打开 HTML 文件或启动默认本机版不会跨设备同步**。下面是一套以 Ubuntu 服务器、自有域名和 Caddy 为例的部署路径。还没有执行部署，也不需要现在购买服务器。公开给其他人注册使用之前，先做独立安全审查、限流与备份恢复演练。
 
 ## 1. 准备地址和运行环境
 
@@ -40,6 +40,7 @@ User=worktable
 Group=worktable
 WorkingDirectory=/opt/everyday-worktable
 Environment=NODE_ENV=production
+Environment=DAYLOOM_MODE=accounts
 Environment=HOST=127.0.0.1
 Environment=PORT=8787
 Environment=WORKTABLE_DATA_DIR=/var/lib/everyday-worktable/data

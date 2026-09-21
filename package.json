@@ -1,8 +1,8 @@
 {
-  "name":"everyday-worktable",
-  "version":"0.1.0",
+  "name":"dayloom",
+  "version":"0.3.0-beta.1",
   "private":true,
-  "description":"任务、习惯和知识的一体化工作台（本地优先，支持跨设备同步）",
+  "description":"任务、习惯和知识的一体化本地工作台",
   "scripts":{"start":"node server.js","test":"node --test tests/*.test.js"},
   "engines":{"node":">=24"}
 }

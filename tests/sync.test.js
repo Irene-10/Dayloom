@@ -9,13 +9,16 @@ const {spawn}=require('node:child_process');
 
 function freePort(){return new Promise(resolve=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});}
 function emptyState(){return {version:4,productId:'everyday-worktable',settings:{name:'测试'},tasks:[],knowledge:[],checkins:{},moods:{},notes:{}};}
-test('公开版默认项目与打卡、空白数据',()=>{
+test('公开版默认项目、打卡与通用知识示例',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','data.js'),'utf8');
   const state=vm.runInNewContext(source+'\n({projects:PROJECT_DEFAULTS.map(p=>p.name),habits:HABIT_DEFAULTS.map(c=>c.l),seed:seed()})');
   assert.deepEqual([...state.projects],['工作事业','长期学习','运动健康','兴趣爱好','日常生活','副业探索']);
   assert.deepEqual([...state.habits],['早睡','运动','阅读','学习']);
   assert.equal(vm.runInNewContext(source+'\nHABIT_DEFAULTS.find(c=>c.k==="study").icon'),'brain');
-  assert.equal(state.seed.tasks.length,0);assert.equal(state.seed.knowledge.length,0);
+  assert.equal(state.seed.tasks.length,0);assert.equal(state.seed.knowledge.length,1);
+  assert.equal(state.seed.knowledge[0].text,'但是太阳，它每时每刻都是夕阳也都是旭日。');
+  assert.deepEqual([...state.seed.knowledge[0].tags],['书籍（示例）/《我与地坛》']);
+  assert.equal(state.seed.settings.name,'Steve');
 });
 test('旧版喝水记录保留原义，新打卡使用独立键',()=>{
   const data=fs.readFileSync(path.join(__dirname,'..','data.js'),'utf8');
@@ -41,7 +44,7 @@ test('旧版记录打卡隐藏但历史保留，学习图标与阅读区分',()=
 test('账号隔离、SQLite 持久化 API、版本冲突',async()=>{
   const port=await freePort();
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'everyday-worktable-test-'));
-  const child=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,PORT:String(port),HOST:'127.0.0.1',WORKTABLE_DATA_DIR:dir},stdio:'ignore'});
+  const child=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,DAYLOOM_MODE:'accounts',PUBLIC_ORIGIN:'',PORT:String(port),HOST:'127.0.0.1',WORKTABLE_DATA_DIR:dir},stdio:'ignore'});
   const base='http://127.0.0.1:'+port;
   const request=async(route,method='GET',body,cookie='')=>{
     const response=await fetch(base+route,{method,headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},body:body?JSON.stringify(body):undefined});
@@ -55,7 +58,7 @@ test('账号隔离、SQLite 持久化 API、版本冲突',async()=>{
     const html=await page.text();
     assert.equal(page.status,200);
     assert.match(html,/Dayloom/);
-    assert.doesNotMatch(html,/flomo_seed|diary_seed|Irene/i);
+    assert.doesNotMatch(html,/flomo_seed|diary_seed/i);
     assert.equal((await fetch(base+'/icon.svg')).status,200);
     assert.equal((await fetch(base+'/manifest.webmanifest')).status,200);
     const a=await request('/api/register','POST',{email:'alice@example.test',password:'long-test-pass-123'});

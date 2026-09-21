@@ -1,4 +1,4 @@
-/* 通用工作台的空白初始数据。不要在此文件放入任何个人笔记或账号信息。 */
+/* 通用工作台的初始数据。仅保留一条公开示例，不放入任何个人笔记或账号信息。 */
 function uid(p){ return (p||'id') + Math.random().toString(36).slice(2,9); }
 function todayMid(){ const x=new Date(); x.setHours(0,0,0,0); return x; }
 function isoLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -78,5 +78,7 @@ function ic(name,size,cls){ const s=size||18; return '<svg class="'+(cls||'')+'"
 const NAV=[{type:'item',view:'home',label:'首页',icon:'home'},{type:'item',view:'today',label:'今日',icon:'fire'},{type:'item',view:'calendar',label:'日历',icon:'calendar'},{type:'item',view:'projects',label:'项目',icon:'target'},{type:'item',view:'knowledge',label:'知识库',icon:'bulb'},{type:'item',view:'statistics',label:'数据',icon:'trend'},{type:'item',view:'settings',label:'设置',icon:'settings'}];
 
 function seed(){
-  return {version:4,productId:'everyday-worktable',settings:{name:'你',theme:'light',palette:'calm'},tasks:[],knowledge:[],knowledgeTags:[],knowledgeReviewLog:{},checkins:{},moods:{},notes:{},dailyLogs:[],projects:PROJECT_DEFAULTS.map(p=>({...p})),habits:HABIT_DEFAULTS.map(c=>({...c}))};
+  const exampleTag='书籍（示例）/《我与地坛》';
+  const exampleCard={id:'example-knowledge-ditan',text:'但是太阳，它每时每刻都是夕阳也都是旭日。',tags:[exampleTag],created:new Date().toISOString(),favorite:false,reviewCount:0};
+  return {version:4,productId:'everyday-worktable',settings:{name:'Steve',theme:'light',palette:'calm'},tasks:[],knowledge:[exampleCard],knowledgeTags:[exampleTag],knowledgeReviewLog:{},aiReadings:{},checkins:{},moods:{},notes:{},dailyLogs:[],projects:PROJECT_DEFAULTS.map(p=>({...p})),habits:HABIT_DEFAULTS.map(c=>({...c}))};
 }
